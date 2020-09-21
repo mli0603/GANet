@@ -9,9 +9,11 @@ import random
 from struct import unpack
 import re
 import sys
-def readPFM(file): 
+
+
+def readPFM(file):
     with open(file, "rb") as f:
-            # Line 1: PF=>RGB (3 channels), Pf=>Greyscale (1 channel)
+        # Line 1: PF=>RGB (3 channels), Pf=>Greyscale (1 channel)
         type = f.readline().decode('latin-1')
         if "PF" in type:
             channels = 3
@@ -25,7 +27,7 @@ def readPFM(file):
         width = int(width)
         height = int(height)
 
-            # Line 3: +ve number means big endian, negative means little endian
+        # Line 3: +ve number means big endian, negative means little endian
         line = f.readline().decode('latin-1')
         BigEndian = True
         if "-" in line:
@@ -42,19 +44,20 @@ def readPFM(file):
         img = unpack(fmt, buffer)
         img = np.reshape(img, (height, width))
         img = np.flipud(img)
-#        quit()
+    #        quit()
     return img, height, width
+
 
 def train_transform(temp_data, crop_height, crop_width, left_right=False, shift=0):
     _, h, w = np.shape(temp_data)
-    
+
     if h > crop_height and w <= crop_width:
         temp = temp_data
-        temp_data = np.zeros([8, h+shift, crop_width + shift], 'float32')
-        temp_data[6:7,:,:] = 1000
+        temp_data = np.zeros([8, h + shift, crop_width + shift], 'float32')
+        temp_data[6:7, :, :] = 1000
         temp_data[:, h + shift - h: h + shift, crop_width + shift - w: crop_width + shift] = temp
         _, h, w = np.shape(temp_data)
-   
+
     if h <= crop_height and w <= crop_width:
         temp = temp_data
         temp_data = np.zeros([8, crop_height + shift, crop_width + shift], 'float32')
@@ -69,7 +72,7 @@ def train_transform(temp_data, crop_height, crop_width, left_right=False, shift=
         start_y = random.randint(0, h - crop_height)
         left = temp_data[0: 3, start_y: start_y + crop_height, start_x + shift_x: start_x + shift_x + crop_width]
         right = temp_data[3: 6, start_y: start_y + crop_height, start_x: start_x + crop_width]
-        target = temp_data[6: 7, start_y: start_y + crop_height, start_x + shift_x : start_x+shift_x + crop_width]
+        target = temp_data[6: 7, start_y: start_y + crop_height, start_x + shift_x: start_x + shift_x + crop_width]
         target = target - shift_x
         return left, right, target
     if h <= crop_height and w <= crop_width:
@@ -91,39 +94,33 @@ def train_transform(temp_data, crop_height, crop_width, left_right=False, shift=
         target = temp_data[6: 7, :, :]
         return left, right, target
 
-        
 
 def test_transform(temp_data, crop_height, crop_width, left_right=False):
     _, h, w = np.shape(temp_data)
- #   if crop_height-h>20 or crop_width-w>20:
- #       print 'crop_size over size!'
+    #   if crop_height-h>20 or crop_width-w>20:
+    #       print 'crop_size over size!'
     if h <= crop_height and w <= crop_width:
         temp = temp_data
-        temp_data = np.zeros([8,crop_height,crop_width], 'float32')
-        temp_data[6: 7, :, :] = 1000
+        temp_data = np.zeros([8, crop_height, crop_width], 'float32')
+        temp_data[6: 7, :, :] = 0.0
         temp_data[:, crop_height - h: crop_height, crop_width - w: crop_width] = temp
     else:
-        start_x = (w-crop_width)/2
-        start_y = (h-crop_height)/2
+        start_x = int((w - crop_width) / 2)
+        start_y = int((h - crop_height) / 2)
         temp_data = temp_data[:, start_y: start_y + crop_height, start_x: start_x + crop_width]
-   
+
     left = temp_data[0: 3, :, :]
     right = temp_data[3: 6, :, :]
     target = temp_data[6: 7, :, :]
-  #  sign=np.ones([1,1,1],'float32')*-1
+    #  sign=np.ones([1,1,1],'float32')*-1
     return left, right, target
 
 
-def load_data(data_path, current_file):
-    A = current_file
-    filename = data_path + 'frames_finalpass/' + A[0: len(A) - 1]
-    left  =Image.open(filename)
-    filename = data_path + 'frames_finalpass/' + A[0: len(A) - 14] + 'right/' + A[len(A) - 9:len(A) - 1]
-    right = Image.open(filename)
-    filename = data_path + 'disparity/' + A[0: len(A) - 4] + 'pfm'
-    disp_left, height, width = readPFM(filename)
-    filename = data_path + 'disparity/' + A[0: len(A) - 14] + 'right/' + A[len(A) - 9: len(A) - 4] + 'pfm'
-    disp_right, height, width = readPFM(filename)
+def load_data(leftname, rightname, dispname):
+    left = Image.open(leftname)
+    right = Image.open(rightname)
+    disp_left, height, width = readPFM(dispname)
+
     size = np.shape(left)
     height = size[0]
     width = size[1]
@@ -132,31 +129,27 @@ def load_data(data_path, current_file):
     right = np.asarray(right)
     r = left[:, :, 0]
     g = left[:, :, 1]
-    b = left[:,:,2]
+    b = left[:, :, 2]
     temp_data[0, :, :] = (r - np.mean(r[:])) / np.std(r[:])
     temp_data[1, :, :] = (g - np.mean(g[:])) / np.std(g[:])
     temp_data[2, :, :] = (b - np.mean(b[:])) / np.std(b[:])
-    r=right[:, :, 0]
-    g=right[:, :, 1]
-    b=right[:, :, 2]	
+    r = right[:, :, 0]
+    g = right[:, :, 1]
+    b = right[:, :, 2]
     temp_data[3, :, :] = (r - np.mean(r[:])) / np.std(r[:])
     temp_data[4, :, :] = (g - np.mean(g[:])) / np.std(g[:])
     temp_data[5, :, :] = (b - np.mean(b[:])) / np.std(b[:])
     temp_data[6: 7, :, :] = width * 2
     temp_data[6, :, :] = disp_left
-    temp_data[7, :, :] = disp_right
     return temp_data
 
 
-def load_kitti_data(file_path, current_file):
+def load_kitti_data(leftname, rightname, dispname):
     """ load current file from the list"""
-    filename = file_path + 'colored_0/' + current_file[0: len(current_file) - 1]
-    left = Image.open(filename)
-    filename = file_path+'colored_1/' + current_file[0: len(current_file) - 1]
-    right = Image.open(filename)
-    filename = file_path+'disp_occ/' + current_file[0: len(current_file) - 1]
+    left = Image.open(leftname)
+    right = Image.open(rightname)
+    disp_left = Image.open(dispname)
 
-    disp_left = Image.open(filename)
     temp = np.asarray(disp_left)
     size = np.shape(left)
 
@@ -169,24 +162,23 @@ def load_kitti_data(file_path, current_file):
     r = left[:, :, 0]
     g = left[:, :, 1]
     b = left[:, :, 2]
- 
-    temp_data[0, :, :] = (r-np.mean(r[:])) / np.std(r[:])
-    temp_data[1, :, :] = (g-np.mean(g[:])) / np.std(g[:])
-    temp_data[2, :, :] = (b-np.mean(b[:])) / np.std(b[:])
-    r=right[:, :, 0]
-    g=right[:, :, 1]
-    b=right[:, :, 2]	
+
+    temp_data[0, :, :] = (r - np.mean(r[:])) / np.std(r[:])
+    temp_data[1, :, :] = (g - np.mean(g[:])) / np.std(g[:])
+    temp_data[2, :, :] = (b - np.mean(b[:])) / np.std(b[:])
+    r = right[:, :, 0]
+    g = right[:, :, 1]
+    b = right[:, :, 2]
 
     temp_data[3, :, :] = (r - np.mean(r[:])) / np.std(r[:])
     temp_data[4, :, :] = (g - np.mean(g[:])) / np.std(g[:])
     temp_data[5, :, :] = (b - np.mean(b[:])) / np.std(b[:])
-    temp_data[6: 7, :, :] = width * 2
-    temp_data[6, :, :] = disp_left[:, :]
-    temp = temp_data[6, :, :]
-    temp[temp < 0.1] = width * 2 * 256
-    temp_data[6, :, :] = temp / 256.
-    
+    temp_data[6: 7, :, :] = 0.0
+    temp_data[6, :, :] = disp_left[:, :] / 256.
+
     return temp_data
+
+
 def load_kitti2015_data(file_path, current_file):
     """ load current file from the list"""
     filename = file_path + 'image_2/' + current_file[0: len(current_file) - 1]
@@ -208,13 +200,13 @@ def load_kitti2015_data(file_path, current_file):
     r = left[:, :, 0]
     g = left[:, :, 1]
     b = left[:, :, 2]
- 
+
     temp_data[0, :, :] = (r - np.mean(r[:])) / np.std(r[:])
     temp_data[1, :, :] = (g - np.mean(g[:])) / np.std(g[:])
     temp_data[2, :, :] = (b - np.mean(b[:])) / np.std(b[:])
     r = right[:, :, 0]
     g = right[:, :, 1]
-    b = right[:, :, 2]	
+    b = right[:, :, 2]
 
     temp_data[3, :, :] = (r - np.mean(r[:])) / np.std(r[:])
     temp_data[4, :, :] = (g - np.mean(g[:])) / np.std(g[:])
@@ -224,41 +216,55 @@ def load_kitti2015_data(file_path, current_file):
     temp = temp_data[6, :, :]
     temp[temp < 0.1] = width * 2 * 256
     temp_data[6, :, :] = temp / 256.
-    
+
     return temp_data
 
 
-
-class DatasetFromList(data.Dataset): 
-    def __init__(self, data_path, file_list, crop_size=[256, 256], training=True, left_right=False, kitti=False, kitti2015=False, shift=0):
+class DatasetFromList(data.Dataset):
+    def __init__(self, left_data, right_data, disp_data, occ_data, crop_height, crop_width, training=False, shift=0):
         super(DatasetFromList, self).__init__()
-        #self.image_filenames = [join(image_dir, x) for x in listdir(image_dir) if is_image_file(x)]
-        f = open(file_list, 'r')
-        self.data_path = data_path
-        self.file_list = f.readlines()
+        # self.image_filenames = [join(image_dir, x) for x in listdir(image_dir) if is_image_file(x)]
+        self.left_data = left_data
+        self.right_data = right_data
+        self.disp_data = disp_data
+        self.occ_data = occ_data
+
         self.training = training
-        self.crop_height = crop_size[0]
-        self.crop_width = crop_size[1]
-        self.left_right = left_right
-        self.kitti = kitti
-        self.kitti2015 = kitti2015
         self.shift = shift
+        self.crop_height = crop_height
+        self.crop_width = crop_width
+        self.left_right = False
 
     def __getitem__(self, index):
-    #    print self.file_list[index]
-        if self.kitti: #load kitti dataset
-            temp_data = load_kitti_data(self.data_path, self.file_list[index])
-        elif self.kitti2015: #load kitti2015 dataset
-            temp_data = load_kitti2015_data(self.data_path, self.file_list[index])
-        else: #load scene flow dataset
-            temp_data = load_data(self.data_path, self.file_list[index])
-#        temp_data = load_data(self.data_path,self.file_list[index])
+        if '.pfm' in self.disp_data[index]:  # load scene flow dataset
+            temp_data = load_data(self.left_data[index], self.right_data[index], self.disp_data[index])
+        else:  # load kitti dataset
+            temp_data = load_kitti_data(self.left_data[index], self.right_data[index], self.disp_data[index])
+
+        disp = temp_data[6, ...]
+        if self.occ_data is None:
+            occ = disp <= 0.0
+        else:
+            occ = np.array(Image.open(self.occ_data[index])).astype(np.bool)
+        temp_data[6, ...][occ] = 0.0
+
         if self.training:
-            input1, input2, target = train_transform(temp_data, self.crop_height, self.crop_width, self.left_right, self.shift)
+            input1, input2, target = train_transform(temp_data, self.crop_height, self.crop_width, self.left_right,
+                                                     self.shift)
             return input1, input2, target
         else:
             input1, input2, target = test_transform(temp_data, self.crop_height, self.crop_width)
+
+            # import matplotlib.pyplot as plt
+            # plt.figure()
+            # plt.imshow(input1.transpose(1,2,0))
+            # plt.figure()
+            # plt.imshow(input2.transpose(1,2,0))
+            # plt.figure()
+            # plt.imshow(target[0])
+            # plt.show()
+
             return input1, input2, target
 
     def __len__(self):
-        return len(self.file_list)
+        return len(self.left_data)
