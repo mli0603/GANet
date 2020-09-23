@@ -131,6 +131,17 @@ if __name__ == "__main__":
         right_data = natsorted(right_data)
         disp_data = natsorted(disp_data)
         occ_data = natsorted(occ_data)
+    elif opt.dataset == 'eth3d':
+        file_path = opt.data_path
+        left_data = [os.path.join(file_path, obj, 'im0.png') for obj in os.listdir(file_path)]
+        right_data = [os.path.join(file_path, obj, 'im1.png') for obj in os.listdir(file_path)]
+        disp_data = [os.path.join(file_path, obj, 'disp0GT.pfm') for obj in os.listdir(file_path)]
+        occ_data = [os.path.join(file_path, obj, 'mask0nocc.png') for obj in os.listdir(file_path)]
+
+        left_data = natsorted(left_data)
+        right_data = natsorted(right_data)
+        disp_data = natsorted(disp_data)
+        occ_data = natsorted(occ_data)
 
     test_data = DatasetFromList(left_data, right_data, disp_data, occ_data)
     test_dataloader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=False, num_workers=2)

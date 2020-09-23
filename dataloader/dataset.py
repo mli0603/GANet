@@ -250,7 +250,7 @@ class DatasetFromList(data.Dataset):
         else:
             if 'SceneFlow' in self.occ_data[index]:
                 occ = np.array(Image.open(self.occ_data[index])).astype(np.bool)
-            elif 'Middlebury' in self.occ_data[index]:
+            elif 'Middlebury' in self.occ_data[index] or 'ETH3D' in self.occ_data[index]:
                 occ = np.array(Image.open(self.occ_data[index])) != 255
         temp_data[6, ...][occ] = 0.0
 
