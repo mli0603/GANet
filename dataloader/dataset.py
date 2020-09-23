@@ -9,6 +9,7 @@ import random
 from struct import unpack
 import re
 import sys
+import math
 
 
 def readPFM(file):
@@ -95,10 +96,12 @@ def train_transform(temp_data, crop_height, crop_width, left_right=False, shift=
         return left, right, target
 
 
-def test_transform(temp_data, crop_height, crop_width, left_right=False):
+def test_transform(temp_data):  # , crop_height, crop_width, left_right=False):
     _, h, w = np.shape(temp_data)
     #   if crop_height-h>20 or crop_width-w>20:
     #       print 'crop_size over size!'
+    crop_height = math.ceil(h / 48) * 48
+    crop_width = math.ceil(w / 48) * 48
     if h <= crop_height and w <= crop_width:
         temp = temp_data
         temp_data = np.zeros([8, crop_height, crop_width], 'float32')
@@ -221,7 +224,7 @@ def load_kitti2015_data(file_path, current_file):
 
 
 class DatasetFromList(data.Dataset):
-    def __init__(self, left_data, right_data, disp_data, occ_data, crop_height, crop_width, training=False, shift=0):
+    def __init__(self, left_data, right_data, disp_data, occ_data, training=False, shift=0):
         super(DatasetFromList, self).__init__()
         # self.image_filenames = [join(image_dir, x) for x in listdir(image_dir) if is_image_file(x)]
         self.left_data = left_data
@@ -231,8 +234,8 @@ class DatasetFromList(data.Dataset):
 
         self.training = training
         self.shift = shift
-        self.crop_height = crop_height
-        self.crop_width = crop_width
+        # self.crop_height = crop_height
+        # self.crop_width = crop_width
         self.left_right = False
 
     def __getitem__(self, index):
@@ -245,7 +248,10 @@ class DatasetFromList(data.Dataset):
         if self.occ_data is None:
             occ = disp <= 0.0
         else:
-            occ = np.array(Image.open(self.occ_data[index])).astype(np.bool)
+            if 'SceneFlow' in self.occ_data[index]:
+                occ = np.array(Image.open(self.occ_data[index])).astype(np.bool)
+            elif 'Middlebury' in self.occ_data[index]:
+                occ = np.array(Image.open(self.occ_data[index])) != 255
         temp_data[6, ...][occ] = 0.0
 
         if self.training:
@@ -253,7 +259,7 @@ class DatasetFromList(data.Dataset):
                                                      self.shift)
             return input1, input2, target
         else:
-            input1, input2, target = test_transform(temp_data, self.crop_height, self.crop_width)
+            input1, input2, target = test_transform(temp_data)  # , self.crop_height, self.crop_width)
 
             # import matplotlib.pyplot as plt
             # plt.figure()

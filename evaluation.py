@@ -26,8 +26,6 @@ import numpy as np
 from natsort import natsorted
 
 parser = argparse.ArgumentParser(description='PyTorch GANet Example')
-parser.add_argument('--crop_height', type=int, required=True, help="crop height")
-parser.add_argument('--crop_width', type=int, required=True, help="crop width")
 parser.add_argument('--max_disp', type=int, default=192, help="max disp")
 parser.add_argument('--resume', type=str, default='', help="resume from saved model")
 parser.add_argument('--cuda', type=bool, default=True, help='use cuda?')
@@ -37,6 +35,7 @@ parser.add_argument('--save_path', type=str, default='./result/', help="location
 parser.add_argument('--threshold', type=float, default=3.0, help="threshold of error rates")
 parser.add_argument('--multi_gpu', type=int, default=0, help="multi_gpu choice")
 parser.add_argument('--model', type=str, default='GANet_deep', help="model to train")
+parser.add_argument('--batch_size', type=int, default=3)
 
 opt = parser.parse_args()
 
@@ -81,10 +80,10 @@ def test(input1, input2):
         prediction = model(input1, input2)
 
     temp = prediction
-    if height <= opt.crop_height and width <= opt.crop_width:
-        temp = temp[:, opt.crop_height - height: opt.crop_height, opt.crop_width - width: opt.crop_width]
-    else:
-        temp = temp[:, :, :]
+    # if height <= opt.crop_height and width <= opt.crop_width:
+    #     temp = temp[:, opt.crop_height - height: opt.crop_height, opt.crop_width - width: opt.crop_width]
+    # else:
+    #     temp = temp[:, :, :]
     # skimage.io.imsave(savename, (temp * 256).astype('uint16'))
     return temp
 
@@ -121,9 +120,20 @@ if __name__ == "__main__":
         right_data = [img.replace('image_2/', 'image_3/') for img in left_data]
         disp_data = [img.replace('image_2/', 'disp_noc_0/') for img in left_data]
         occ_data = None
+    elif opt.dataset == 'middlebury':
+        file_path = opt.data_path
+        left_data = [os.path.join(file_path, obj, 'im0.png') for obj in os.listdir(file_path)]
+        right_data = [os.path.join(file_path, obj, 'im1.png') for obj in os.listdir(file_path)]
+        disp_data = [os.path.join(file_path, obj, 'disp0GT.pfm') for obj in os.listdir(file_path)]
+        occ_data = [os.path.join(file_path, obj, 'mask0nocc.png') for obj in os.listdir(file_path)]
 
-    test_data = DatasetFromList(left_data, right_data, disp_data, occ_data, opt.crop_height, opt.crop_width)
-    test_dataloader = DataLoader(test_data, batch_size=3, shuffle=False, num_workers=2)
+        left_data = natsorted(left_data)
+        right_data = natsorted(right_data)
+        disp_data = natsorted(disp_data)
+        occ_data = natsorted(occ_data)
+
+    test_data = DatasetFromList(left_data, right_data, disp_data, occ_data)
+    test_dataloader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=False, num_workers=2)
 
     avg_error = 0.0
     avg_wrong = 0.0
