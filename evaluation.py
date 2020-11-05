@@ -36,6 +36,7 @@ parser.add_argument('--threshold', type=float, default=3.0, help="threshold of e
 parser.add_argument('--multi_gpu', type=int, default=0, help="multi_gpu choice")
 parser.add_argument('--model', type=str, default='GANet_deep', help="model to train")
 parser.add_argument('--batch_size', type=int, default=3)
+parser.add_argument('--within_max_disp', action='store_true')
 
 opt = parser.parse_args()
 
@@ -131,17 +132,13 @@ if __name__ == "__main__":
         right_data = natsorted(right_data)
         disp_data = natsorted(disp_data)
         occ_data = natsorted(occ_data)
-    elif opt.dataset == 'eth3d':
+    elif opt.dataset == 'scared':
         file_path = opt.data_path
-        left_data = [os.path.join(file_path, obj, 'im0.png') for obj in os.listdir(file_path)]
-        right_data = [os.path.join(file_path, obj, 'im1.png') for obj in os.listdir(file_path)]
-        disp_data = [os.path.join(file_path, obj, 'disp0GT.pfm') for obj in os.listdir(file_path)]
-        occ_data = [os.path.join(file_path, obj, 'mask0nocc.png') for obj in os.listdir(file_path)]
-
-        left_data = natsorted(left_data)
-        right_data = natsorted(right_data)
-        disp_data = natsorted(disp_data)
-        occ_data = natsorted(occ_data)
+        left_data = natsorted(
+            [os.path.join(file_path, 'left/', img) for img in os.listdir(os.path.join(file_path, 'left'))])
+        right_data = [img.replace('left/', 'right/') for img in left_data]
+        disp_data = [img.replace('left/', 'disparity/').replace('.png', '.tiff') for img in left_data]
+        occ_data = [img.replace('left/', 'occlusion/') for img in left_data]
 
     test_data = DatasetFromList(left_data, right_data, disp_data, occ_data)
     test_dataloader = DataLoader(test_data, batch_size=opt.batch_size, shuffle=False, num_workers=2)
@@ -152,7 +149,10 @@ if __name__ == "__main__":
     for index, (left, right, disp) in enumerate(test_dataloader):
         prediction = test(left, right)
         disp = disp.squeeze(1).cuda()  # NxHxW
-        mask = disp > 0.0
+        if opt.within_max_disp:
+            mask = torch.logical_and(disp > 0.0, disp < opt.max_disp)
+        else:
+            mask = disp > 0.0
 
         error = F.l1_loss(prediction[mask], disp[mask], reduction='none')
         wrong = torch.sum(error > opt.threshold).item()
@@ -161,7 +161,7 @@ if __name__ == "__main__":
         avg_wrong += wrong
         avg_total += total
         print("===> Iteration {}: ".format(index) + " ==> EPE Error: {:.4f}, Error Rate: {:.4f}".format(
-            torch.mean(error), wrong / total))
+            torch.mean(error), wrong / total * 100))
 
         # np.save('left.npy', left.data.cpu())
         # np.save('right.npy', right.data.cpu())
@@ -177,6 +177,6 @@ if __name__ == "__main__":
         # asdf
 
     avg_error = avg_error / len(test_dataloader)
-    avg_rate = avg_wrong / avg_total
+    avg_rate = avg_wrong / avg_total * 100
     print("===> Total {} Frames ==> AVG EPE Error: {:.4f}, AVG Error Rate: {:.4f}".format(len(test_dataloader),
                                                                                           avg_error, avg_rate))

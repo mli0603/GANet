@@ -10,6 +10,7 @@ from struct import unpack
 import re
 import sys
 import math
+from tifffile import imread
 
 
 def readPFM(file):
@@ -182,15 +183,12 @@ def load_kitti_data(leftname, rightname, dispname):
     return temp_data
 
 
-def load_kitti2015_data(file_path, current_file):
+def load_tiff_data(leftname, rightname, dispname):
     """ load current file from the list"""
-    filename = file_path + 'image_2/' + current_file[0: len(current_file) - 1]
-    left = Image.open(filename)
-    filename = file_path + 'image_3/' + current_file[0: len(current_file) - 1]
-    right = Image.open(filename)
-    filename = file_path + 'disp_occ_0/' + current_file[0: len(current_file) - 1]
+    left = Image.open(leftname)
+    right = Image.open(rightname)
+    disp_left = imread(dispname).squeeze(0)
 
-    disp_left = Image.open(filename)
     temp = np.asarray(disp_left)
     size = np.shape(left)
 
@@ -214,11 +212,8 @@ def load_kitti2015_data(file_path, current_file):
     temp_data[3, :, :] = (r - np.mean(r[:])) / np.std(r[:])
     temp_data[4, :, :] = (g - np.mean(g[:])) / np.std(g[:])
     temp_data[5, :, :] = (b - np.mean(b[:])) / np.std(b[:])
-    temp_data[6: 7, :, :] = width * 2
+    temp_data[6: 7, :, :] = 0.0
     temp_data[6, :, :] = disp_left[:, :]
-    temp = temp_data[6, :, :]
-    temp[temp < 0.1] = width * 2 * 256
-    temp_data[6, :, :] = temp / 256.
 
     return temp_data
 
@@ -241,6 +236,8 @@ class DatasetFromList(data.Dataset):
     def __getitem__(self, index):
         if '.pfm' in self.disp_data[index]:  # load scene flow dataset
             temp_data = load_data(self.left_data[index], self.right_data[index], self.disp_data[index])
+        elif '.tiff' in self.disp_data[index]:
+            temp_data = load_tiff_data(self.left_data[index], self.right_data[index], self.disp_data[index])
         else:  # load kitti dataset
             temp_data = load_kitti_data(self.left_data[index], self.right_data[index], self.disp_data[index])
 
@@ -248,9 +245,10 @@ class DatasetFromList(data.Dataset):
         if self.occ_data is None:
             occ = disp <= 0.0
         else:
-            if 'SceneFlow' in self.occ_data[index]:
+            if 'SceneFlow'.lower() in self.occ_data[index].lower():
                 occ = np.array(Image.open(self.occ_data[index])).astype(np.bool)
-            elif 'Middlebury' in self.occ_data[index] or 'ETH3D' in self.occ_data[index]:
+            elif 'Middlebury' in self.occ_data[index] or 'ETH3D' in self.occ_data[index] or 'EndoVis' in self.occ_data[
+                index]:
                 occ = np.array(Image.open(self.occ_data[index])) != 255
         temp_data[6, ...][occ] = 0.0
 
